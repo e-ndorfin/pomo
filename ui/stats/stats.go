@@ -26,6 +26,7 @@ type Model struct {
 	// components
 	durationRatio components.DurationRatio
 	barChart      components.BarChart
+	hourlyChart   components.HourlyChart
 	heatMap       components.HeatMap
 	streak        components.Streak
 
@@ -35,6 +36,7 @@ type Model struct {
 	// stats
 	allTimeStats db.AllTimeStats
 	weeklyStats  []db.DailyStat
+	hourlyStats  []db.HourlyStat
 	monthlyStats []db.DailyStat
 	streakStats  db.StreakStats
 
@@ -48,6 +50,7 @@ func New() Model {
 	return Model{
 		durationRatio: components.NewDurationRatio(durationRatioWidth),
 		barChart:      components.NewBarChart(barChartHeight),
+		hourlyChart:   components.NewHourlyChart(barChartHeight),
 		heatMap:       components.NewHeatMap(),
 		streak:        components.NewStreak(),
 		help:          help.New(),
@@ -57,6 +60,7 @@ func New() Model {
 type statsMsg struct {
 	allTimeStats db.AllTimeStats
 	weeklyStats  []db.DailyStat
+	hourlyStats  []db.HourlyStat
 	monthlyStats []db.DailyStat
 	streakStats  db.StreakStats
 }
@@ -85,6 +89,11 @@ func fetchStats() tea.Msg {
 		return errMsg{err: errors.New("failed to fetch weekly stats")}
 	}
 
+	hourlyStats, err := repo.GetTodayHourlyStats()
+	if err != nil {
+		return errMsg{err: errors.New("failed to fetch hourly stats")}
+	}
+
 	monthlyStats, err := repo.GetLastMonthsStats(components.NumberOfMonths)
 	if err != nil {
 		return errMsg{err: errors.New("failed to fetch heatmap stats")}
@@ -98,6 +107,7 @@ func fetchStats() tea.Msg {
 	return statsMsg{
 		allTimeStats: stats,
 		weeklyStats:  weeklyStats,
+		hourlyStats:  hourlyStats,
 		monthlyStats: monthlyStats,
 		streakStats:  streakStats,
 	}
@@ -125,10 +135,11 @@ func (m Model) View() string {
 
 	streak := m.streak.View(m.streakStats)
 
-	chart := m.barChart.View(m.weeklyStats)
+	weeklyChart := m.barChart.View(m.weeklyStats)
+	hourlyChart := m.hourlyChart.View(m.hourlyStats)
 	hMap := m.heatMap.View(m.monthlyStats)
 
-	charts := lipgloss.JoinHorizontal(lipgloss.Bottom, chart, "   ", hMap)
+	charts := lipgloss.JoinHorizontal(lipgloss.Bottom, weeklyChart, "   ", hourlyChart)
 
 	return lipgloss.Place(
 		m.width, m.height,
@@ -142,6 +153,8 @@ func (m Model) View() string {
 			streak,
 			"\n",
 			charts,
+			"\n",
+			hMap,
 			"",
 			m.help.View(Keys),
 		),
@@ -153,6 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case statsMsg:
 		m.allTimeStats = msg.allTimeStats
 		m.weeklyStats = msg.weeklyStats
+		m.hourlyStats = msg.hourlyStats
 		m.monthlyStats = msg.monthlyStats
 		m.streakStats = msg.streakStats
 		return m, nil

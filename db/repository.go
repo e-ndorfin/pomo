@@ -89,6 +89,49 @@ func (r *SessionRepo) GetStreakStats() (StreakStats, error) {
 	return calculateStreak(dates), nil
 }
 
+// GetTodayHourlyStats retrieves work duration broken down by hour for today.
+func (r *SessionRepo) GetTodayHourlyStats() ([]HourlyStat, error) {
+	today := time.Now().Format(DateFormat)
+
+	var stats []HourlyStat
+
+	if err := r.db.Select(
+		&stats,
+		`
+		SELECT
+			CAST(strftime('%H', started_at, 'localtime') AS INTEGER) AS hour,
+			COALESCE(SUM(duration * (type = 'work')), 0) AS work_duration
+		FROM sessions
+		WHERE date(started_at, 'localtime') = ?
+		GROUP BY hour
+		ORDER BY hour;
+		`,
+		today,
+	); err != nil {
+		return nil, err
+	}
+
+	return normalizeHourlyStats(stats), nil
+}
+
+// normalizeHourlyStats ensures there is an entry for each hour 0-23.
+func normalizeHourlyStats(stats []HourlyStat) []HourlyStat {
+	m := make(map[int]HourlyStat)
+	for _, s := range stats {
+		m[s.Hour] = s
+	}
+
+	normalized := make([]HourlyStat, 24)
+	for h := 0; h < 24; h++ {
+		normalized[h] = HourlyStat{
+			Hour:         h,
+			WorkDuration: m[h].WorkDuration,
+		}
+	}
+
+	return normalized
+}
+
 // retrieves daily work duration statistics between the specified dates.
 // from and to are inclusive.
 // The results are normalized to include all days in the range.
