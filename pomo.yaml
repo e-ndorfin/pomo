@@ -3,6 +3,7 @@
 # https://github.com/Bahaaio/pomo
 
 onSessionEnd: ask
+countIdleTime: true
 
 asciiArt:
   enabled: true
@@ -10,7 +11,7 @@ asciiArt:
   color: "#5A56E0"
 
 work:
-  duration: 25m
+  duration: 50m
   title: work session
   notification:
     enabled: true
@@ -22,7 +23,7 @@ work:
   #   - [spd-say, "Time to take a break"]
 
 break:
-  duration: 5m
+  duration: 10m
   title: break session
   notification:
     enabled: true
