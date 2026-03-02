@@ -71,15 +71,15 @@ func (t SessionSummary) Print() {
 	fmt.Println(messageStyle.Render("Session Summary:"))
 
 	if t.totalWorkDuration > 0 {
-		fmt.Printf(" Work : %v (%d %s)\n", t.totalWorkDuration, t.totalWorkSessions, workIndicator)
+		fmt.Printf(" Work : %v (%d %s)\n", t.totalWorkDuration.Truncate(time.Second), t.totalWorkSessions, workIndicator)
 	}
 
 	if t.totalBreakDuration > 0 {
-		fmt.Printf(" Break: %v (%d %s)\n", t.totalBreakDuration, t.totalBreakSessions, breakIndicator)
+		fmt.Printf(" Break: %v (%d %s)\n", t.totalBreakDuration.Truncate(time.Second), t.totalBreakSessions, breakIndicator)
 	}
 
 	if t.totalBreakDuration > 0 && t.totalWorkDuration > 0 {
-		fmt.Println(" Total:", t.totalWorkDuration+t.totalBreakDuration)
+		fmt.Println(" Total:", (t.totalWorkDuration + t.totalBreakDuration).Truncate(time.Second))
 	}
 
 	if t.totalWorkDuration > 0 {

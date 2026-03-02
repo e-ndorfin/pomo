@@ -77,7 +77,7 @@ func (r *SessionRepo) GetStreakStats() (StreakStats, error) {
 	if err := r.db.Select(
 		&dates,
 		`
-		SELECT DISTINCT date(started_at) AS day
+		SELECT DISTINCT date(started_at, 'localtime') AS day
 		FROM sessions
 		WHERE type = 'work'
 		ORDER BY day DESC;
@@ -102,10 +102,10 @@ func (r *SessionRepo) getDailyStats(from, to time.Time) ([]DailyStat, error) {
 		&stats,
 		`
 		SELECT
-			date(started_at) AS day,
+			date(started_at, 'localtime') AS day,
 			COALESCE(SUM(duration * (type = 'work')), 0) AS work_duration
 		FROM sessions
-		WHERE date(started_at) BETWEEN ? AND ?
+		WHERE date(started_at, 'localtime') BETWEEN ? AND ?
 		GROUP BY day
 		ORDER BY day;
 		`,

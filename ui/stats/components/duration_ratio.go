@@ -50,8 +50,8 @@ func (d *DurationRatio) View(workDuration, breakDuration time.Duration) string {
 }
 
 func (d *DurationRatio) buildTop(workDuration, breakDuration time.Duration) string {
-	workLabel := workDuration.String()
-	breakLabel := breakDuration.String()
+	workLabel := workDuration.Truncate(time.Second).String()
+	breakLabel := breakDuration.Truncate(time.Second).String()
 
 	paddingLength := max(d.width-len(workLabel)-len(breakLabel), 0)
 	padding := strings.Repeat(" ", paddingLength)

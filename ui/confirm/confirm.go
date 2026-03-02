@@ -98,7 +98,7 @@ func (m Model) View(prompt string, idleDuration time.Duration) string {
 
 	idle := ""
 	if idleDuration.Seconds() > 0 {
-		idle = idleStyle.Render("idle for " + idleDuration.String())
+		idle = idleStyle.Render("idle for " + idleDuration.Truncate(time.Second).String())
 	}
 
 	help := m.help.View(Keys)
