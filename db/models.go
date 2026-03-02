@@ -38,6 +38,11 @@ type HourlyStat struct {
 	WorkDuration time.Duration `db:"work_duration"`
 }
 
+type PeriodStats struct {
+	WorkDuration  time.Duration `db:"work_duration"`
+	BreakDuration time.Duration `db:"break_duration"`
+}
+
 type StreakStats struct {
 	Current int
 	Best    int

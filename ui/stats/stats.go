@@ -24,7 +24,9 @@ var errStyle = lipgloss.NewStyle().
 
 type Model struct {
 	// components
-	durationRatio components.DurationRatio
+	dailyRatio    components.DurationRatio
+	weeklyRatio   components.DurationRatio
+	lifetimeRatio components.DurationRatio
 	barChart      components.BarChart
 	hourlyChart   components.HourlyChart
 	heatMap       components.HeatMap
@@ -35,6 +37,8 @@ type Model struct {
 
 	// stats
 	allTimeStats db.AllTimeStats
+	dailyStats   db.PeriodStats
+	weeklyDurationStats db.PeriodStats
 	weeklyStats  []db.DailyStat
 	hourlyStats  []db.HourlyStat
 	monthlyStats []db.DailyStat
@@ -48,7 +52,9 @@ type Model struct {
 
 func New() Model {
 	return Model{
-		durationRatio: components.NewDurationRatio(durationRatioWidth),
+		dailyRatio:    components.NewDurationRatio(durationRatioWidth, "Today"),
+		weeklyRatio:   components.NewDurationRatio(durationRatioWidth, "Weekly"),
+		lifetimeRatio: components.NewDurationRatio(durationRatioWidth, "Lifetime"),
 		barChart:      components.NewBarChart(barChartHeight),
 		hourlyChart:   components.NewHourlyChart(barChartHeight),
 		heatMap:       components.NewHeatMap(),
@@ -58,11 +64,13 @@ func New() Model {
 }
 
 type statsMsg struct {
-	allTimeStats db.AllTimeStats
-	weeklyStats  []db.DailyStat
-	hourlyStats  []db.HourlyStat
-	monthlyStats []db.DailyStat
-	streakStats  db.StreakStats
+	allTimeStats        db.AllTimeStats
+	dailyStats          db.PeriodStats
+	weeklyDurationStats db.PeriodStats
+	weeklyStats         []db.DailyStat
+	hourlyStats         []db.HourlyStat
+	monthlyStats        []db.DailyStat
+	streakStats         db.StreakStats
 }
 
 type errMsg struct {
@@ -82,6 +90,16 @@ func fetchStats() tea.Msg {
 	stats, err := repo.GetAllTimeStats()
 	if err != nil {
 		return errMsg{err: errors.New("failed to fetch all-time stats")}
+	}
+
+	dailyStats, err := repo.GetTodayDurationStats()
+	if err != nil {
+		return errMsg{err: errors.New("failed to fetch daily stats")}
+	}
+
+	weeklyDurationStats, err := repo.GetWeeklyDurationStats()
+	if err != nil {
+		return errMsg{err: errors.New("failed to fetch weekly duration stats")}
 	}
 
 	weeklyStats, err := repo.GetWeeklyStats()
@@ -105,11 +123,13 @@ func fetchStats() tea.Msg {
 	}
 
 	return statsMsg{
-		allTimeStats: stats,
-		weeklyStats:  weeklyStats,
-		hourlyStats:  hourlyStats,
-		monthlyStats: monthlyStats,
-		streakStats:  streakStats,
+		allTimeStats:        stats,
+		dailyStats:          dailyStats,
+		weeklyDurationStats: weeklyDurationStats,
+		weeklyStats:         weeklyStats,
+		hourlyStats:         hourlyStats,
+		monthlyStats:        monthlyStats,
+		streakStats:         streakStats,
 	}
 }
 
@@ -128,9 +148,22 @@ func (m Model) View() string {
 
 	title := "Pomodoro statistics"
 
-	durationRatio := m.durationRatio.View(
+	dailyRatio := m.dailyRatio.View(
+		m.dailyStats.WorkDuration,
+		m.dailyStats.BreakDuration,
+	)
+	weeklyRatio := m.weeklyRatio.View(
+		m.weeklyDurationStats.WorkDuration,
+		m.weeklyDurationStats.BreakDuration,
+	)
+	lifetimeRatio := m.lifetimeRatio.View(
 		m.allTimeStats.TotalWorkDuration,
 		m.allTimeStats.TotalBreakDuration,
+	)
+
+	durationRatios := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		dailyRatio, "   ", weeklyRatio, "   ", lifetimeRatio,
 	)
 
 	streak := m.streak.View(m.streakStats)
@@ -148,7 +181,7 @@ func (m Model) View() string {
 			lipgloss.Center,
 			title,
 			"\n\n",
-			durationRatio,
+			durationRatios,
 			"",
 			streak,
 			"\n",
@@ -165,6 +198,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case statsMsg:
 		m.allTimeStats = msg.allTimeStats
+		m.dailyStats = msg.dailyStats
+		m.weeklyDurationStats = msg.weeklyDurationStats
 		m.weeklyStats = msg.weeklyStats
 		m.hourlyStats = msg.hourlyStats
 		m.monthlyStats = msg.monthlyStats

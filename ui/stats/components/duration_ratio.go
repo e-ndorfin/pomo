@@ -17,11 +17,13 @@ var (
 
 type DurationRatio struct {
 	width int
+	label string
 }
 
-func NewDurationRatio(width int) DurationRatio {
+func NewDurationRatio(width int, label string) DurationRatio {
 	return DurationRatio{
 		width: width,
+		label: label,
 	}
 }
 
@@ -37,16 +39,22 @@ func (d *DurationRatio) View(workDuration, breakDuration time.Duration) string {
 	workPercentage := int(math.Round(workRatio * 100))
 	breakPercentage := 100 - workPercentage
 
+	label := d.buildLabel()
 	top := d.buildTop(workDuration, breakDuration)
 	bar := d.buildBar(workPercentage)
 	bottom := d.buildBottom(workPercentage, breakPercentage)
 
 	return lipgloss.JoinVertical(
-		lipgloss.Left,
+		lipgloss.Center,
+		label,
 		top,
 		bar,
 		bottom,
 	)
+}
+
+func (d *DurationRatio) buildLabel() string {
+	return d.label
 }
 
 func (d *DurationRatio) buildTop(workDuration, breakDuration time.Duration) string {

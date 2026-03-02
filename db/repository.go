@@ -53,6 +53,41 @@ func (r *SessionRepo) GetAllTimeStats() (AllTimeStats, error) {
 	return totalStats, nil
 }
 
+// GetTodayDurationStats retrieves total work and break durations for today.
+func (r *SessionRepo) GetTodayDurationStats() (PeriodStats, error) {
+	today := time.Now()
+	return r.getPeriodStats(today, today)
+}
+
+// GetWeeklyDurationStats retrieves total work and break durations for the past 7 days.
+func (r *SessionRepo) GetWeeklyDurationStats() (PeriodStats, error) {
+	today := time.Now()
+	firstDay := today.AddDate(0, 0, -6)
+	return r.getPeriodStats(firstDay, today)
+}
+
+func (r *SessionRepo) getPeriodStats(from, to time.Time) (PeriodStats, error) {
+	fromStr := from.Format(DateFormat)
+	toStr := to.Format(DateFormat)
+
+	var stats PeriodStats
+	if err := r.db.Get(
+		&stats,
+		`
+		SELECT
+			COALESCE(SUM(duration * (type = 'work')), 0)  AS work_duration,
+			COALESCE(SUM(duration * (type = 'break')), 0) AS break_duration
+		FROM sessions
+		WHERE date(started_at, 'localtime') BETWEEN ? AND ?;
+		`,
+		fromStr, toStr,
+	); err != nil {
+		return PeriodStats{}, err
+	}
+
+	return stats, nil
+}
+
 // GetWeeklyStats retrieves daily work duration statistics for the past 7 days.
 func (r *SessionRepo) GetWeeklyStats() ([]DailyStat, error) {
 	today := time.Now()
