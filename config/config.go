@@ -73,7 +73,7 @@ var (
 			"color":   colors.TimerFg,
 		},
 		"work": map[string]any{
-			"duration": 25 * time.Minute,
+			"duration": 50 * time.Minute,
 			"title":    "work session",
 			"notification": map[string]any{
 				"enabled": true,
@@ -83,7 +83,7 @@ var (
 			},
 		},
 		"break": map[string]any{
-			"duration": 5 * time.Minute,
+			"duration": 10 * time.Minute,
 			"title":    "break session",
 			"notification": map[string]any{
 				"enabled": true,

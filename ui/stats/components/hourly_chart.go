@@ -65,22 +65,15 @@ func (h *HourlyChart) View(stats []db.HourlyStat) string {
 		return ""
 	}
 
-	maxDuration := getMaxHourlyDuration(stats)
-
-	targetTicks := h.barHeight / 2
-	scale := calculateScale(maxDuration, targetTicks)
-
-	if maxDuration == 0 {
-		maxDuration = time.Hour
-		scale = time.Minute * 10
-	}
+	maxDuration := time.Hour
+	scale := time.Minute * 12 // 0, 12m, 24m, 36m, 48m, 60m
 
 	h.hourlyChartLayout = h.calculateLayout(maxDuration, scale)
 
 	yAxis := h.buildYAxis(maxDuration, scale)
 	bars := h.buildBars(stats, maxDuration)
 
-	top := lipgloss.JoinHorizontal(lipgloss.Left, yAxis, hourlySpacer, bars)
+	top := lipgloss.JoinHorizontal(lipgloss.Bottom, yAxis, hourlySpacer, bars)
 	xAxis := h.buildXAxis()
 	labels := h.buildLabels()
 
@@ -119,9 +112,9 @@ func (h *HourlyChart) buildYAxis(maxDuration, scale time.Duration) string {
 		builder.WriteString(tick)
 
 		axis := strings.Repeat(paddingChar, h.yAxisLabelWidth) + paddingChar + axisChar
+		builder.WriteString(axis)
 
 		if duration-scale >= epsilon {
-			builder.WriteString(axis)
 			builder.WriteString("\n")
 		}
 	}
@@ -170,14 +163,3 @@ func renderHourlyBar(height int) string {
 	return barStyle.Render(strings.Repeat(bar+"\n", height-1) + bar)
 }
 
-func getMaxHourlyDuration(stats []db.HourlyStat) time.Duration {
-	var maxDuration time.Duration
-
-	for _, stat := range stats {
-		if stat.WorkDuration > maxDuration {
-			maxDuration = stat.WorkDuration
-		}
-	}
-
-	return maxDuration
-}

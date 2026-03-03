@@ -52,7 +52,7 @@ type Model struct {
 
 func New() Model {
 	return Model{
-		dailyRatio:    components.NewDurationRatio(durationRatioWidth, "Today"),
+		dailyRatio:    components.NewDurationRatio(durationRatioWidth, "Past 24h"),
 		weeklyRatio:   components.NewDurationRatio(durationRatioWidth, "Weekly"),
 		lifetimeRatio: components.NewDurationRatio(durationRatioWidth, "Lifetime"),
 		barChart:      components.NewBarChart(barChartHeight),
@@ -92,7 +92,7 @@ func fetchStats() tea.Msg {
 		return errMsg{err: errors.New("failed to fetch all-time stats")}
 	}
 
-	dailyStats, err := repo.GetTodayDurationStats()
+	dailyStats, err := repo.GetLast24hDurationStats()
 	if err != nil {
 		return errMsg{err: errors.New("failed to fetch daily stats")}
 	}

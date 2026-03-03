@@ -53,10 +53,26 @@ func (r *SessionRepo) GetAllTimeStats() (AllTimeStats, error) {
 	return totalStats, nil
 }
 
-// GetTodayDurationStats retrieves total work and break durations for today.
-func (r *SessionRepo) GetTodayDurationStats() (PeriodStats, error) {
-	today := time.Now()
-	return r.getPeriodStats(today, today)
+// GetLast24hDurationStats retrieves total work and break durations for the past 24 hours.
+func (r *SessionRepo) GetLast24hDurationStats() (PeriodStats, error) {
+	cutoff := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
+
+	var stats PeriodStats
+	if err := r.db.Get(
+		&stats,
+		`
+		SELECT
+			COALESCE(SUM(duration * (type = 'work')), 0)  AS work_duration,
+			COALESCE(SUM(duration * (type = 'break')), 0) AS break_duration
+		FROM sessions
+		WHERE started_at >= ?;
+		`,
+		cutoff,
+	); err != nil {
+		return PeriodStats{}, err
+	}
+
+	return stats, nil
 }
 
 // GetWeeklyDurationStats retrieves total work and break durations for the past 7 days.
@@ -125,25 +141,61 @@ func (r *SessionRepo) GetStreakStats() (StreakStats, error) {
 }
 
 // GetTodayHourlyStats retrieves work duration broken down by hour for today.
+// Session durations are split across hour boundaries so that each hour
+// only counts the time actually spent within that hour.
 func (r *SessionRepo) GetTodayHourlyStats() ([]HourlyStat, error) {
 	today := time.Now().Format(DateFormat)
 
-	var stats []HourlyStat
+	var sessions []struct {
+		StartedAt string        `db:"started_at"`
+		Duration  time.Duration `db:"duration"`
+	}
 
 	if err := r.db.Select(
-		&stats,
+		&sessions,
 		`
-		SELECT
-			CAST(strftime('%H', started_at, 'localtime') AS INTEGER) AS hour,
-			COALESCE(SUM(duration * (type = 'work')), 0) AS work_duration
+		SELECT started_at, duration
 		FROM sessions
-		WHERE date(started_at, 'localtime') = ?
-		GROUP BY hour
-		ORDER BY hour;
+		WHERE date(started_at, 'localtime') = ? AND type = 'work'
+		ORDER BY started_at;
 		`,
 		today,
 	); err != nil {
 		return nil, err
+	}
+
+	hourly := make(map[int]time.Duration)
+
+	for _, s := range sessions {
+		startedAt, err := time.Parse(time.RFC3339, s.StartedAt)
+		if err != nil {
+			continue
+		}
+		startedAt = startedAt.Local()
+		remaining := s.Duration
+
+		for remaining > 0 {
+			hour := startedAt.Hour()
+			nextHour := time.Date(
+				startedAt.Year(), startedAt.Month(), startedAt.Day(),
+				hour+1, 0, 0, 0, startedAt.Location(),
+			)
+			timeLeftInHour := nextHour.Sub(startedAt)
+
+			if remaining <= timeLeftInHour {
+				hourly[hour] += remaining
+				remaining = 0
+			} else {
+				hourly[hour] += timeLeftInHour
+				remaining -= timeLeftInHour
+				startedAt = nextHour
+			}
+		}
+	}
+
+	stats := make([]HourlyStat, 0, len(hourly))
+	for hour, dur := range hourly {
+		stats = append(stats, HourlyStat{Hour: hour, WorkDuration: dur})
 	}
 
 	return normalizeHourlyStats(stats), nil
