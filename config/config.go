@@ -66,7 +66,7 @@ var (
 
 	DefaultConfig = map[string]any{
 		"onSessionEnd":  "ask",
-		"countIdleTime": false,
+		"countIdleTime": true,
 		"asciiArt": map[string]any{
 			"enabled": true,
 			"font":    ascii.DefaultFont,

@@ -26,7 +26,8 @@ or specify a custom duration. The timer shows a progress bar and sends
 desktop notifications when complete.`,
 	Example: `  pomo           # Start work session
   pomo 1h15m     # Start 1 hour 15 minute session
-  pomo 45m 15m   # Start 45 minute work session with 15 minute break`,
+  pomo 45m 15m   # Start 45 minute work session with 15 minute break
+  pomo add 11:00 12:00   # Retroactively log a session from 11:00 to 12:00`,
 
 	Args: cobra.MaximumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
