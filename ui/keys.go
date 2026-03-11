@@ -26,6 +26,10 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{}
 }
 
+var forceQuitKey = key.NewBinding(
+	key.WithKeys("ctrl+c"),
+)
+
 var keyMap = KeyMap{
 	Increase: key.NewBinding(
 		key.WithKeys("k", "up"),

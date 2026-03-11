@@ -10,6 +10,7 @@ import (
 	"github.com/Bahaaio/pomo/config"
 	"github.com/Bahaaio/pomo/db"
 	"github.com/Bahaaio/pomo/ui/confirm"
+	"github.com/Bahaaio/pomo/ui/stats"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/timer"
@@ -21,19 +22,91 @@ type (
 	commandsDoneMsg struct{}
 )
 
+func (m *Model) handleHomeKeys(msg tea.Msg) tea.Cmd {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return nil
+	}
+
+	switch keyMsg.String() {
+	case "p", " ":
+		return m.startTimerFromHome()
+	case "s":
+		return m.enterStats()
+	case "q", "ctrl+c":
+		return tea.Quit
+	}
+
+	return nil
+}
+
+func (m *Model) startTimerFromHome() tea.Cmd {
+	task := config.WorkTask.GetTask()
+	m.screen = ScreenTimer
+	m.currentTaskType = config.WorkTask
+	m.currentTask = *task
+	m.elapsed = 0
+	m.duration = task.Duration
+	m.timer = timer.New(task.Duration)
+	m.sessionState = Running
+	m.cyclePosition = 1
+
+	return tea.Batch(
+		m.progressBar.SetPercent(0.0),
+		m.timer.Init(),
+	)
+}
+
+func (m *Model) enterStats() tea.Cmd {
+	sm := stats.New()
+	sm.BackMode = true
+	m.statsModel = sm
+	m.screen = ScreenStats
+
+	return tea.Batch(
+		m.statsModel.Init(),
+		func() tea.Msg {
+			return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+		},
+	)
+}
+
+func (m *Model) goHome() {
+	if m.commandsCancel != nil {
+		m.commandsCancel()
+	}
+	m.commandsWg, m.commandsCancel = nil, nil
+	m.screen = ScreenHome
+	m.elapsed = 0
+	m.sessionState = Running
+}
+
 func (m *Model) handleKeys(msg tea.KeyMsg) tea.Cmd {
 	if m.sessionState == ShowingConfirm {
 		return m.confirmDialog.HandleKeys(msg)
 	}
 
 	if m.sessionState == WaitingForCommands {
-		// allow quitting immediately while waiting for commands
-		if key.Matches(msg, keyMap.Quit) {
+		if key.Matches(msg, forceQuitKey) {
 			return m.Quit()
 		}
-
-		// ignore other keys
+		if key.Matches(msg, keyMap.Quit) {
+			if m.appMode {
+				if m.commandsCancel != nil {
+					m.commandsCancel()
+				}
+				m.goHome()
+				return nil
+			}
+			return m.Quit()
+		}
 		return nil
+	}
+
+	// ctrl+c always force quits
+	if key.Matches(msg, forceQuitKey) {
+		m.recordSession()
+		return m.Quit()
 	}
 
 	switch {
@@ -65,6 +138,10 @@ func (m *Model) handleKeys(msg tea.KeyMsg) tea.Cmd {
 
 	case key.Matches(msg, keyMap.Quit):
 		m.recordSession()
+		if m.appMode {
+			m.goHome()
+			return nil
+		}
 		return m.Quit()
 
 	default:
@@ -85,18 +162,12 @@ func (m *Model) handleConfirmChoice(msg confirm.ChoiceMsg) tea.Cmd {
 	case confirm.ShortSession:
 		return m.shortSession()
 	case confirm.Cancel:
+		if m.appMode {
+			m.goHome()
+			return nil
+		}
 		return m.Quit()
 	}
-
-	return nil
-}
-
-func (m *Model) handleWindowResize(msg tea.WindowSizeMsg) tea.Cmd {
-	m.confirmDialog.HandleWindowResize(msg) // always update it
-
-	m.width = msg.Width
-	m.height = msg.Height
-	m.progressBar.Width = min(m.width-2*padding-margin, maxWidth)
 
 	return nil
 }
@@ -194,9 +265,17 @@ func (m *Model) handleCompletion() tea.Cmd {
 	case "start":
 		return m.nextSession()
 	case "quit":
+		if m.appMode {
+			m.goHome()
+			return nil
+		}
 		return m.Quit()
 	default:
 		log.Printf("unknown onSessionEnd value %q, defaulting to quit", m.onSessionEnd)
+		if m.appMode {
+			m.goHome()
+			return nil
+		}
 		return m.Quit()
 	}
 }
@@ -300,6 +379,10 @@ func (m *Model) recordSession() {
 
 // handles the completion of post actions and quits the application
 func (m *Model) handleCommandsDone() tea.Cmd {
+	if m.appMode {
+		m.goHome()
+		return nil
+	}
 	m.sessionState = Quitting
 	return tea.Quit
 }

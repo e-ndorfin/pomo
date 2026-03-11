@@ -11,11 +11,20 @@ import (
 	"github.com/Bahaaio/pomo/ui/ascii"
 	"github.com/Bahaaio/pomo/ui/colors"
 	"github.com/Bahaaio/pomo/ui/confirm"
+	"github.com/Bahaaio/pomo/ui/stats"
 	"github.com/Bahaaio/pomo/ui/summary"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/timer"
 	"github.com/charmbracelet/lipgloss"
+)
+
+type Screen byte
+
+const (
+	ScreenTimer Screen = iota
+	ScreenHome
+	ScreenStats
 )
 
 type Model struct {
@@ -51,6 +60,12 @@ type Model struct {
 
 	// databse
 	repo *db.SessionRepo
+
+	// navigation
+	screen     Screen
+	appMode    bool
+	statsModel stats.Model
+	cfg        config.Config
 }
 
 func NewModel(taskType config.TaskType, cfg config.Config) Model {
@@ -103,7 +118,55 @@ func NewModel(taskType config.TaskType, cfg config.Config) Model {
 		timerFont:       timerFont,
 		asciiTimerStyle: timerStyle,
 
-		repo: repo,
+		repo:   repo,
+		screen: ScreenTimer,
+		cfg:    cfg,
+	}
+}
+
+func NewAppModel(cfg config.Config) Model {
+	timerStyle := lipgloss.NewStyle()
+	var timerFont ascii.Font
+
+	if cfg.ASCIIArt.Enabled {
+		timerFont = ascii.GetFont(cfg.ASCIIArt.Font)
+		timerColor := colors.GetColor(cfg.ASCIIArt.Color)
+		timerStyle = timerStyle.Foreground(timerColor)
+	}
+
+	sessionSummary := summary.SessionSummary{}
+
+	database, err := db.Connect()
+	var repo *db.SessionRepo
+
+	if err != nil {
+		log.Printf("failed to initialize database: %v", err)
+		sessionSummary.SetDatabaseUnavailable()
+	} else {
+		repo = db.NewSessionRepo(database)
+	}
+
+	return Model{
+		progressBar:   progress.New(progress.WithDefaultGradient()),
+		confirmDialog: confirm.New(),
+		help:          help.New(),
+
+		onSessionEnd:    cfg.OnSessionEnd,
+		countIdleTime:   cfg.CountIdleTime,
+		currentTaskType: config.WorkTask,
+		currentTask:     *config.WorkTask.GetTask(),
+		sessionSummary:  sessionSummary,
+		longBreak:       cfg.LongBreak,
+		cyclePosition:   1,
+
+		useTimerArt:     cfg.ASCIIArt.Enabled,
+		timerFont:       timerFont,
+		asciiTimerStyle: timerStyle,
+
+		repo:    repo,
+		screen:  ScreenHome,
+		appMode: true,
+		cfg:     cfg,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Bahaaio/pomo/ui/ascii"
 	"github.com/Bahaaio/pomo/ui/colors"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -98,7 +99,92 @@ func (m *Model) buildTimeLeft() string {
 }
 
 func (m *Model) buildHelpView() string {
+	if m.appMode {
+		appKeyMap := keyMap
+		appKeyMap.Quit = key.NewBinding(
+			key.WithKeys("q"),
+			key.WithHelp("q", "back"),
+		)
+		return m.help.View(appKeyMap)
+	}
 	return m.help.View(keyMap)
+}
+
+func (m *Model) buildHomeView() string {
+	tomato := buildTomatoArt()
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FF6347"))
+
+	menuItemStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#AAAAAA"))
+
+	keyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Bold(true)
+
+	title := titleStyle.Render("pomo")
+
+	menu := lipgloss.JoinVertical(lipgloss.Left,
+		keyStyle.Render("p/space")+"  "+menuItemStyle.Render("start session"),
+		keyStyle.Render("s")+"       "+menuItemStyle.Render("stats"),
+		keyStyle.Render("q")+"       "+menuItemStyle.Render("quit"),
+	)
+
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		tomato,
+		"",
+		"",
+		title,
+		"",
+		menu,
+	)
+
+	return lipgloss.Place(
+		m.width, m.height,
+		lipgloss.Center, lipgloss.Center,
+		content,
+	)
+}
+
+func buildTomatoArt() string {
+	r := lipgloss.NewStyle().Foreground(lipgloss.Color("#E83020")) // red body
+	d := lipgloss.NewStyle().Foreground(lipgloss.Color("#B82818")) // dark red shadow
+	h := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF9080")) // highlight
+	g := lipgloss.NewStyle().Foreground(lipgloss.Color("#3C8C2C")) // green stem
+	l := lipgloss.NewStyle().Foreground(lipgloss.Color("#5BAD4B")) // light green leaf
+
+	b := func(s lipgloss.Style, n int) string {
+		out := ""
+		for range n {
+			out += "█"
+		}
+		return s.Render(out)
+	}
+	sp := func(n int) string {
+		out := ""
+		for range n {
+			out += " "
+		}
+		return out
+	}
+
+	lines := []string{
+		b(g, 2),                                       // stem
+		b(l, 2) + sp(1) + b(g, 4) + sp(1) + b(l, 2), // leaves + stem base
+		b(h, 2) + b(r, 14) + b(d, 2),                 // body top (18)
+		b(h, 1) + b(r, 20) + b(d, 1),                 // widen (22)
+		b(h, 1) + b(r, 21) + b(d, 2),                 // near max (24)
+		b(r, 24),                                      // max width
+		b(r, 24),                                      // max width
+		b(r, 22) + b(d, 2),                            // taper + shadow (24)
+		b(r, 20) + b(d, 2),                            // (22)
+		b(r, 16) + b(d, 2),                            // (18)
+		b(r, 12),                                      // bottom (12)
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Center, lines...)
 }
 
 func (m Model) buildWaitingForCommandsView() string {

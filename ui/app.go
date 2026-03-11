@@ -3,6 +3,8 @@ package ui
 
 import (
 	"github.com/Bahaaio/pomo/ui/confirm"
+	"github.com/Bahaaio/pomo/ui/stats"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,16 +12,47 @@ import (
 )
 
 func (m Model) Init() tea.Cmd {
-	return m.timer.Init()
+	switch m.screen {
+	case ScreenHome:
+		return nil
+	case ScreenStats:
+		return m.statsModel.Init()
+	default:
+		return m.timer.Init()
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// handle window resize globally
+	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = msg.Width
+		m.height = msg.Height
+		m.confirmDialog.HandleWindowResize(msg)
+		m.progressBar.Width = min(m.width-2*padding-margin, maxWidth)
+
+		if m.screen == ScreenStats {
+			updatedStats, cmd := m.statsModel.Update(msg)
+			m.statsModel = updatedStats.(stats.Model)
+			return m, cmd
+		}
+
+		return m, nil
+	}
+
+	switch m.screen {
+	case ScreenHome:
+		return m, m.handleHomeKeys(msg)
+	case ScreenStats:
+		return m.updateStats(msg)
+	default:
+		return m.updateTimer(msg)
+	}
+}
+
+func (m Model) updateTimer(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m, m.handleKeys(msg)
-
-	case tea.WindowSizeMsg:
-		return m, m.handleWindowResize(msg)
 
 	case timer.TickMsg:
 		return m, m.handleTimerTick(msg)
@@ -44,7 +77,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
+func (m Model) updateStats(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		if key.Matches(msg, forceQuitKey) {
+			return m, tea.Quit
+		}
+		if key.Matches(msg, keyMap.Quit) {
+			if m.appMode {
+				m.goHome()
+				return m, nil
+			}
+			return m, tea.Quit
+		}
+	}
+
+	updatedStats, cmd := m.statsModel.Update(msg)
+	m.statsModel = updatedStats.(stats.Model)
+	return m, cmd
+}
+
 func (m Model) View() string {
+	switch m.screen {
+	case ScreenHome:
+		return m.buildHomeView()
+	case ScreenStats:
+		return m.statsModel.View()
+	default:
+		return m.buildTimerView()
+	}
+}
+
+func (m Model) buildTimerView() string {
 	if m.sessionState == Quitting {
 		return ""
 	}

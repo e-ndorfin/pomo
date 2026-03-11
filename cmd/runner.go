@@ -12,6 +12,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func runApp() {
+	log.Println("starting app in home screen mode")
+
+	m := ui.NewAppModel(config.C)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+
+	finalModel, err := p.Run()
+	if err != nil {
+		die(err)
+	}
+
+	finalModel.(ui.Model).GetSessionSummary().Print()
+}
+
 func runTask(taskType config.TaskType, cmd *cobra.Command) {
 	task := taskType.GetTask()
 

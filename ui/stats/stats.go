@@ -48,6 +48,7 @@ type Model struct {
 	width, height int
 	help          help.Model
 	quitting      bool
+	BackMode      bool // when true, show "back" instead of "quit"
 }
 
 func New() Model {
@@ -174,6 +175,16 @@ func (m Model) View() string {
 
 	charts := lipgloss.JoinHorizontal(lipgloss.Bottom, weeklyChart, "   ", hourlyChart)
 
+	helpKeys := Keys
+	if m.BackMode {
+		helpKeys = KeyMap{
+			Quit: key.NewBinding(
+				key.WithKeys("q"),
+				key.WithHelp("q", "back"),
+			),
+		}
+	}
+
 	return lipgloss.Place(
 		m.width, m.height,
 		lipgloss.Center, lipgloss.Center,
@@ -189,7 +200,7 @@ func (m Model) View() string {
 			"\n",
 			hMap,
 			"",
-			m.help.View(Keys),
+			m.help.View(helpKeys),
 		),
 	)
 }

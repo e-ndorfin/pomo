@@ -32,7 +32,11 @@ desktop notifications when complete.`,
 	Args: cobra.MaximumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Println("rootCmd args:", args)
-		runTask(config.WorkTask, cmd)
+		if len(args) == 0 {
+			runApp()
+		} else {
+			runTask(config.WorkTask, cmd)
+		}
 	},
 }
 
