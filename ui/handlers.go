@@ -31,6 +31,8 @@ func (m *Model) handleHomeKeys(msg tea.Msg) tea.Cmd {
 	switch keyMsg.String() {
 	case "p", " ":
 		return m.startTimerFromHome()
+	case "b":
+		return m.startBreakFromHome()
 	case "s":
 		return m.enterStats()
 	case "q", "ctrl+c":
@@ -44,6 +46,23 @@ func (m *Model) startTimerFromHome() tea.Cmd {
 	task := config.WorkTask.GetTask()
 	m.screen = ScreenTimer
 	m.currentTaskType = config.WorkTask
+	m.currentTask = *task
+	m.elapsed = 0
+	m.duration = task.Duration
+	m.timer = timer.New(task.Duration)
+	m.sessionState = Running
+	m.cyclePosition = 1
+
+	return tea.Batch(
+		m.progressBar.SetPercent(0.0),
+		m.timer.Init(),
+	)
+}
+
+func (m *Model) startBreakFromHome() tea.Cmd {
+	task := config.BreakTask.GetTask()
+	m.screen = ScreenTimer
+	m.currentTaskType = config.BreakTask
 	m.currentTask = *task
 	m.elapsed = 0
 	m.duration = task.Duration
@@ -369,7 +388,7 @@ func (m *Model) recordSession() {
 	}
 
 	if err := m.repo.CreateSession(
-		time.Now(),
+		time.Now().Add(-m.elapsed),
 		m.elapsed,
 		db.GetSessionType(m.currentTaskType),
 	); err != nil {

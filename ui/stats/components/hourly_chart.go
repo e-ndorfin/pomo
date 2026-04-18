@@ -66,7 +66,7 @@ func (h *HourlyChart) View(stats []db.HourlyStat) string {
 	}
 
 	maxDuration := time.Hour
-	scale := time.Minute * 12 // 0, 12m, 24m, 36m, 48m, 60m
+	scale := time.Minute * 12
 
 	h.hourlyChartLayout = h.calculateLayout(maxDuration, scale)
 
@@ -152,6 +152,7 @@ func (h *HourlyChart) buildLabels() string {
 
 	return padding + labels.String()
 }
+
 
 func renderHourlyBar(height int) string {
 	if height == 0 {

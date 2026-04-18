@@ -128,6 +128,7 @@ func (m *Model) buildHomeView() string {
 
 	menu := lipgloss.JoinVertical(lipgloss.Left,
 		keyStyle.Render("p/space")+"  "+menuItemStyle.Render("start session"),
+		keyStyle.Render("b")+"       "+menuItemStyle.Render("start break"),
 		keyStyle.Render("s")+"       "+menuItemStyle.Render("stats"),
 		keyStyle.Render("q")+"       "+menuItemStyle.Render("quit"),
 	)
