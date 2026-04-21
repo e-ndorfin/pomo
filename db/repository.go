@@ -17,12 +17,14 @@ func NewSessionRepo(db *sqlx.DB) *SessionRepo {
 }
 
 // CreateSession inserts a new session record into the database.
-func (r *SessionRepo) CreateSession(startedAt time.Time, duration time.Duration, sessionType SessionType) error {
+func (r *SessionRepo) CreateSession(startedAt time.Time, endedAt time.Time, duration time.Duration, sessionType SessionType) error {
 	startedAtStr := startedAt.Format(time.RFC3339)
+	endedAtStr := endedAt.Format(time.RFC3339)
 
 	if _, err := r.db.Exec(
-		"insert into sessions (started_at, duration, type) values (?, ?, ?);",
+		"insert into sessions (started_at, ended_at, duration, type) values (?, ?, ?, ?);",
 		startedAtStr,
+		endedAtStr,
 		duration,
 		sessionType,
 	); err != nil {

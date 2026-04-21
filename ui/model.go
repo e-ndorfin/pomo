@@ -44,6 +44,7 @@ type Model struct {
 	countIdleTime    bool
 	sessionState     SessionState
 	confirmStartTime time.Time
+	sessionStartedAt time.Time
 	currentTaskType  config.TaskType
 	currentTask      config.Task
 	sessionSummary   summary.SessionSummary
