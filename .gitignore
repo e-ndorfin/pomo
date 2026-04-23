@@ -3,3 +3,5 @@ debug.log
 pomo
 dist/
 *.db
+.DS_Store
+Pomo.app/

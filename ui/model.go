@@ -44,6 +44,7 @@ type Model struct {
 	countIdleTime    bool
 	sessionState     SessionState
 	confirmStartTime time.Time
+	sessionStartedAt time.Time
 	currentTaskType  config.TaskType
 	currentTask      config.Task
 	sessionSummary   summary.SessionSummary
@@ -105,14 +106,15 @@ func NewModel(taskType config.TaskType, cfg config.Config) Model {
 		timer:    timer.New(task.Duration),
 		duration: task.Duration,
 
-		onSessionEnd:    cfg.OnSessionEnd,
-		countIdleTime:   cfg.CountIdleTime,
-		sessionState:    Running,
-		currentTaskType: taskType,
-		currentTask:     *task,
-		sessionSummary:  sessionSummary,
-		longBreak:       cfg.LongBreak,
-		cyclePosition:   1,
+		onSessionEnd:     cfg.OnSessionEnd,
+		countIdleTime:    cfg.CountIdleTime,
+		sessionState:     Running,
+		sessionStartedAt: time.Now(),
+		currentTaskType:  taskType,
+		currentTask:      *task,
+		sessionSummary:   sessionSummary,
+		longBreak:        cfg.LongBreak,
+		cyclePosition:    1,
 
 		useTimerArt:     cfg.ASCIIArt.Enabled,
 		timerFont:       timerFont,
