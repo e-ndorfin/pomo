@@ -24,6 +24,15 @@ func NewSessionRepo(db *sqlx.DB) *SessionRepo {
 	return &SessionRepo{db: db}
 }
 
+// Close closes the underlying database connection.
+func (r *SessionRepo) Close() error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+
+	return r.db.Close()
+}
+
 // CreateSession inserts a new session record into the database.
 func (r *SessionRepo) CreateSession(startedAt time.Time, endedAt time.Time, duration time.Duration, sessionType SessionType) error {
 	startedAtStr := startedAt.Format(time.RFC3339)

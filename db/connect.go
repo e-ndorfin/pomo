@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/Bahaaio/pomo/config"
 	"github.com/jmoiron/sqlx"
@@ -16,23 +17,28 @@ import (
 
 const DBFile = config.AppName + ".db"
 
+var (
+	dbPathOverride string
+	dbPathMu       sync.RWMutex
+)
+
 // Connect connects to the SQLite database,
 // creates the necessary directories,
 // and performs migrations if needed.
 func Connect() (*sqlx.DB, error) {
-	dbDir, err := getDBDir()
+	dbPath, err := ResolveDBPath()
 	if err != nil {
 		log.Println("failed to get db path:", err)
 		return nil, err
 	}
+
+	dbDir := filepath.Dir(dbPath)
 
 	// create the db directory if it doesn't exist
 	if err = os.MkdirAll(dbDir, 0o755); err != nil {
 		log.Println("failed to create db directory:", err)
 		return nil, err
 	}
-
-	dbPath := filepath.Join(dbDir, DBFile)
 
 	db, err := sqlx.Open("sqlite", dbPath)
 	if err != nil {
@@ -57,6 +63,45 @@ func Connect() (*sqlx.DB, error) {
 	}
 
 	return db, nil
+}
+
+// ResolveDBPath returns the active database path, respecting any process-level override.
+func ResolveDBPath() (string, error) {
+	dbPathMu.RLock()
+	override := dbPathOverride
+	dbPathMu.RUnlock()
+
+	if override != "" {
+		return override, nil
+	}
+
+	return DefaultDBPath()
+}
+
+// DefaultDBPath returns the standard on-disk database path for the current user.
+func DefaultDBPath() (string, error) {
+	dbDir, err := getDBDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dbDir, DBFile), nil
+}
+
+// SetDBPathOverride forces Connect to use a specific database path for the current process.
+func SetDBPathOverride(path string) {
+	dbPathMu.Lock()
+	defer dbPathMu.Unlock()
+
+	dbPathOverride = path
+}
+
+// ClearDBPathOverride removes any process-level database path override.
+func ClearDBPathOverride() {
+	dbPathMu.Lock()
+	defer dbPathMu.Unlock()
+
+	dbPathOverride = ""
 }
 
 func createSchema(db *sqlx.DB) error {
