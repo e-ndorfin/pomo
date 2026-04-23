@@ -14,6 +14,7 @@ import (
 )
 
 var version = "1.1.1"
+var testMode bool
 
 var rootCmd = &cobra.Command{
 	Use:     "pomo [work duration] [break duration]",
@@ -30,6 +31,9 @@ desktop notifications when complete.`,
   pomo add 11:00 12:00   # Retroactively log a session from 11:00 to 12:00`,
 
 	Args: cobra.MaximumNArgs(2),
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return setupTestMode()
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Println("rootCmd args:", args)
 		if len(args) == 0 {
@@ -41,6 +45,8 @@ desktop notifications when complete.`,
 }
 
 func Execute() error {
+	defer cleanupTestMode()
+
 	return rootCmd.Execute()
 }
 
@@ -48,6 +54,7 @@ func init() {
 	initLogging()
 	initConfig()
 	beeep.AppName = config.AppName
+	rootCmd.PersistentFlags().BoolVar(&testMode, "test", false, "use a temporary copy of the session database for this run")
 }
 
 func initConfig() {
@@ -79,5 +86,7 @@ func die(err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 	}
+
+	cleanupTestMode()
 	os.Exit(1)
 }
