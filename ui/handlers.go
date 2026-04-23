@@ -150,6 +150,7 @@ func (m *Model) handleKeys(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, keyMap.Reset):
 		m.elapsed = 0
 		m.duration = m.currentTask.Duration
+		m.sessionStartedAt = time.Now()
 		return m.updateProgressBar()
 
 	case key.Matches(msg, keyMap.Skip):
