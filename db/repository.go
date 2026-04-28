@@ -42,6 +42,29 @@ func (r *SessionRepo) CreateSession(startedAt time.Time, endedAt time.Time, dura
 	return nil
 }
 
+// DeleteMostRecentSession deletes the most recently inserted session record.
+func (r *SessionRepo) DeleteMostRecentSession() (bool, error) {
+	result, err := r.db.Exec(`
+		DELETE FROM sessions
+		WHERE id = (
+			SELECT id
+			FROM sessions
+			ORDER BY id DESC
+			LIMIT 1
+		);
+	`)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rowsAffected > 0, nil
+}
+
 // GetAllTimeStats retrieves aggregate statistics across all sessions.
 func (r *SessionRepo) GetAllTimeStats() (AllTimeStats, error) {
 	var totalStats AllTimeStats

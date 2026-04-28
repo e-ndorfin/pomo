@@ -80,6 +80,34 @@ func TestSessionRepoStatsHandleLegacyAndNewRows(t *testing.T) {
 	assert.Equal(t, 2, streakStats.Best)
 }
 
+func TestDeleteMostRecentSession(t *testing.T) {
+	repo := newTestRepo(t)
+
+	now := time.Now()
+	insertNewSession(t, repo.db, now.Add(-3*time.Hour), now.Add(-2*time.Hour), time.Hour, WorkSession)
+	insertNewSession(t, repo.db, now.Add(-2*time.Hour), now.Add(-90*time.Minute), 30*time.Minute, BreakSession)
+	insertNewSession(t, repo.db, now.Add(-1*time.Hour), now.Add(-30*time.Minute), 30*time.Minute, WorkSession)
+
+	deleted, err := repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.True(t, deleted)
+	assert.Equal(t, []int{1, 2}, sessionIDs(t, repo.db))
+
+	deleted, err = repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.True(t, deleted)
+	assert.Equal(t, []int{1}, sessionIDs(t, repo.db))
+
+	deleted, err = repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.True(t, deleted)
+	assert.Empty(t, sessionIDs(t, repo.db))
+
+	deleted, err = repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.False(t, deleted)
+}
+
 func newTestRepo(t *testing.T) *SessionRepo {
 	t.Helper()
 
@@ -93,6 +121,14 @@ func newTestRepo(t *testing.T) *SessionRepo {
 	require.NoError(t, createSchema(database))
 
 	return NewSessionRepo(database)
+}
+
+func sessionIDs(t *testing.T, database *sqlx.DB) []int {
+	t.Helper()
+
+	var ids []int
+	require.NoError(t, database.Select(&ids, "SELECT id FROM sessions ORDER BY id"))
+	return ids
 }
 
 func insertLegacySession(t *testing.T, database *sqlx.DB, actualStart time.Time, recordedEnd time.Time, duration time.Duration, sessionType SessionType) {
