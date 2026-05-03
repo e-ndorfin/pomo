@@ -1,8 +1,6 @@
 package db
 
 import (
-	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -14,26 +12,17 @@ type SessionRepo struct {
 	db *sqlx.DB
 }
 
-const effectiveStartedAtExpr = `
-CASE
-	WHEN ended_at IS NOT NULL AND ended_at != '' THEN started_at
-	ELSE datetime(unixepoch(started_at) - CAST(duration / 1000000000 AS INTEGER), 'unixepoch')
-END
-`
-
 func NewSessionRepo(db *sqlx.DB) *SessionRepo {
 	return &SessionRepo{db: db}
 }
 
 // CreateSession inserts a new session record into the database.
-func (r *SessionRepo) CreateSession(startedAt time.Time, endedAt time.Time, duration time.Duration, sessionType SessionType) error {
+func (r *SessionRepo) CreateSession(startedAt time.Time, duration time.Duration, sessionType SessionType) error {
 	startedAtStr := startedAt.Format(time.RFC3339)
-	endedAtStr := endedAt.Format(time.RFC3339)
 
 	if _, err := r.db.Exec(
-		"insert into sessions (started_at, ended_at, duration, type) values (?, ?, ?, ?);",
+		"insert into sessions (started_at, duration, type) values (?, ?, ?);",
 		startedAtStr,
-		endedAtStr,
 		duration,
 		sessionType,
 	); err != nil {
@@ -41,76 +30,6 @@ func (r *SessionRepo) CreateSession(startedAt time.Time, endedAt time.Time, dura
 	}
 
 	return nil
-}
-
-// GetMostRecentSession retrieves the most recently inserted session record.
-func (r *SessionRepo) GetMostRecentSession() (*Session, error) {
-	var row struct {
-		ID        int            `db:"id"`
-		Type      string         `db:"type"`
-		Duration  time.Duration  `db:"duration"`
-		StartedAt string         `db:"started_at"`
-		EndedAt   sql.NullString `db:"ended_at"`
-	}
-
-	if err := r.db.Get(&row, `
-		SELECT id, type, duration, started_at, ended_at
-		FROM sessions
-		ORDER BY id DESC
-		LIMIT 1;
-	`); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	startedAt, err := time.Parse(time.RFC3339, row.StartedAt)
-	if err != nil {
-		return nil, fmt.Errorf("parse session start time: %w", err)
-	}
-
-	var endedAt time.Time
-	if row.EndedAt.Valid && row.EndedAt.String != "" {
-		endedAt, err = time.Parse(time.RFC3339, row.EndedAt.String)
-		if err != nil {
-			return nil, fmt.Errorf("parse session end time: %w", err)
-		}
-	} else {
-		endedAt = startedAt
-		startedAt = endedAt.Add(-row.Duration)
-	}
-
-	return &Session{
-		ID:        row.ID,
-		Type:      row.Type,
-		Duration:  row.Duration,
-		StartedAt: startedAt,
-		EndedAt:   &endedAt,
-	}, nil
-}
-
-// DeleteMostRecentSession deletes the most recently inserted session record.
-func (r *SessionRepo) DeleteMostRecentSession() (bool, error) {
-	result, err := r.db.Exec(`
-		DELETE FROM sessions
-		WHERE id = (
-			SELECT id
-			FROM sessions
-			ORDER BY id DESC
-			LIMIT 1
-		);
-	`)
-	if err != nil {
-		return false, err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-
-	return rowsAffected > 0, nil
 }
 
 // GetAllTimeStats retrieves aggregate statistics across all sessions.
@@ -141,13 +60,13 @@ func (r *SessionRepo) GetLast24hDurationStats() (PeriodStats, error) {
 	var stats PeriodStats
 	if err := r.db.Get(
 		&stats,
-		fmt.Sprintf(`
+		`
 		SELECT
 			COALESCE(SUM(duration * (type = 'work')), 0)  AS work_duration,
 			COALESCE(SUM(duration * (type = 'break')), 0) AS break_duration
 		FROM sessions
-		WHERE unixepoch(%s) >= unixepoch(?);
-		`, effectiveStartedAtExpr),
+		WHERE started_at >= ?;
+		`,
 		cutoff,
 	); err != nil {
 		return PeriodStats{}, err
@@ -170,13 +89,13 @@ func (r *SessionRepo) getPeriodStats(from, to time.Time) (PeriodStats, error) {
 	var stats PeriodStats
 	if err := r.db.Get(
 		&stats,
-		fmt.Sprintf(`
+		`
 		SELECT
 			COALESCE(SUM(duration * (type = 'work')), 0)  AS work_duration,
 			COALESCE(SUM(duration * (type = 'break')), 0) AS break_duration
 		FROM sessions
-		WHERE date(%s, 'localtime') BETWEEN ? AND ?;
-		`, effectiveStartedAtExpr),
+		WHERE date(started_at, 'localtime') BETWEEN ? AND ?;
+		`,
 		fromStr, toStr,
 	); err != nil {
 		return PeriodStats{}, err
@@ -208,12 +127,12 @@ func (r *SessionRepo) GetStreakStats() (StreakStats, error) {
 
 	if err := r.db.Select(
 		&dates,
-		fmt.Sprintf(`
-		SELECT DISTINCT date(%s, 'localtime') AS day
+		`
+		SELECT DISTINCT date(started_at, 'localtime') AS day
 		FROM sessions
 		WHERE type = 'work'
 		ORDER BY day DESC;
-		`, effectiveStartedAtExpr),
+		`,
 	); err != nil {
 		return StreakStats{}, err
 	}
@@ -228,18 +147,18 @@ func (r *SessionRepo) GetTodayHourlyStats() ([]HourlyStat, error) {
 	today := time.Now().Format(DateFormat)
 
 	var sessions []struct {
-		StartedAtUnix int64         `db:"started_at_unix"`
-		Duration      time.Duration `db:"duration"`
+		StartedAt string        `db:"started_at"`
+		Duration  time.Duration `db:"duration"`
 	}
 
 	if err := r.db.Select(
 		&sessions,
-		fmt.Sprintf(`
-		SELECT unixepoch(%s) AS started_at_unix, duration
+		`
+		SELECT started_at, duration
 		FROM sessions
-		WHERE date(%s, 'localtime') = ? AND type = 'work'
-		ORDER BY started_at_unix;
-		`, effectiveStartedAtExpr, effectiveStartedAtExpr),
+		WHERE date(started_at, 'localtime') = ? AND type = 'work'
+		ORDER BY started_at;
+		`,
 		today,
 	); err != nil {
 		return nil, err
@@ -248,7 +167,11 @@ func (r *SessionRepo) GetTodayHourlyStats() ([]HourlyStat, error) {
 	hourly := make(map[int]time.Duration)
 
 	for _, s := range sessions {
-		startedAt := time.Unix(s.StartedAtUnix, 0).Local()
+		startedAt, err := time.Parse(time.RFC3339, s.StartedAt)
+		if err != nil {
+			continue
+		}
+		startedAt = startedAt.Local()
 		remaining := s.Duration
 
 		for remaining > 0 {
@@ -307,15 +230,15 @@ func (r *SessionRepo) getDailyStats(from, to time.Time) ([]DailyStat, error) {
 
 	if err := r.db.Select(
 		&stats,
-		fmt.Sprintf(`
+		`
 		SELECT
-			date(%s, 'localtime') AS day,
+			date(started_at, 'localtime') AS day,
 			COALESCE(SUM(duration * (type = 'work')), 0) AS work_duration
 		FROM sessions
-		WHERE date(%s, 'localtime') BETWEEN ? AND ?
+		WHERE date(started_at, 'localtime') BETWEEN ? AND ?
 		GROUP BY day
 		ORDER BY day;
-		`, effectiveStartedAtExpr, effectiveStartedAtExpr),
+		`,
 		fromStr, toStr,
 	); err != nil {
 		return nil, err

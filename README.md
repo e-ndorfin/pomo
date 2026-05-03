@@ -83,12 +83,6 @@ View statistics:
 pomo stats        # View your productivity stats
 ```
 
-Undo the most recent session:
-
-```bash
-pomo undo         # Delete the most recent session after confirmation
-```
-
 ## Installation
 
 ### Homebrew (macOS)

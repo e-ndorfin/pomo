@@ -20,7 +20,6 @@ type Session struct {
 	Type      string        `db:"type"`
 	Duration  time.Duration `db:"duration"`
 	StartedAt time.Time     `db:"started_at"`
-	EndedAt   *time.Time    `db:"ended_at"`
 }
 
 type AllTimeStats struct {
