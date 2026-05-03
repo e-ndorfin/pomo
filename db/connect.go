@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/Bahaaio/pomo/config"
 	"github.com/jmoiron/sqlx"
@@ -63,6 +64,12 @@ func createSchema(db *sqlx.DB) error {
 		return err
 	}
 	log.Println("created the schema")
+
+	if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN ended_at TEXT;"); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column") {
+			return err
+		}
+	}
 
 	return nil
 }

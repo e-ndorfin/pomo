@@ -48,7 +48,7 @@ func runAdd(startArg, endArg string) {
 	defer database.Close()
 
 	repo := db.NewSessionRepo(database)
-	if err := repo.CreateSession(start, duration, db.WorkSession); err != nil {
+	if err := repo.CreateSession(start, end, duration, db.WorkSession); err != nil {
 		die(fmt.Errorf("failed to log session: %w", err))
 	}
 

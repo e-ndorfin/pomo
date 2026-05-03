@@ -95,6 +95,7 @@ func (h *HourlyChart) buildBars(stats []db.HourlyStat, maxDuration time.Duration
 		}
 
 		barHeight := int((float64(stat.WorkDuration) / float64(maxDuration)) * float64(h.barHeight))
+		barHeight = min(barHeight, h.barHeight)
 		bar := renderHourlyBar(barHeight)
 		bars = append(bars, bar, hourlySpacer)
 	}
@@ -153,7 +154,6 @@ func (h *HourlyChart) buildLabels() string {
 	return padding + labels.String()
 }
 
-
 func renderHourlyBar(height int) string {
 	if height == 0 {
 		return strings.Repeat(paddingChar, hourlyBarThickness)
@@ -163,4 +163,3 @@ func renderHourlyBar(height int) string {
 
 	return barStyle.Render(strings.Repeat(bar+"\n", height-1) + bar)
 }
-

@@ -49,6 +49,7 @@ func (m *Model) startTimerFromHome() tea.Cmd {
 	m.currentTask = *task
 	m.elapsed = 0
 	m.duration = task.Duration
+	m.sessionStartedAt = time.Now()
 	m.timer = timer.New(task.Duration)
 	m.sessionState = Running
 	m.cyclePosition = 1
@@ -66,6 +67,7 @@ func (m *Model) startBreakFromHome() tea.Cmd {
 	m.currentTask = *task
 	m.elapsed = 0
 	m.duration = task.Duration
+	m.sessionStartedAt = time.Now()
 	m.timer = timer.New(task.Duration)
 	m.sessionState = Running
 	m.cyclePosition = 1
@@ -136,19 +138,19 @@ func (m *Model) handleKeys(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, keyMap.Pause):
 		if m.sessionState == Paused {
 			m.sessionState = Running
-		} else {
-			m.sessionState = Paused
-		}
-
-		if m.sessionState == Running {
+			m.sessionStartedAt = time.Now()
 			return m.timer.Start()
 		}
 
+		m.sessionState = Paused
+		m.recordSession()
+		m.elapsed = 0
 		return nil
 
 	case key.Matches(msg, keyMap.Reset):
 		m.elapsed = 0
 		m.duration = m.currentTask.Duration
+		m.sessionStartedAt = time.Now()
 		return m.updateProgressBar()
 
 	case key.Matches(msg, keyMap.Skip):
@@ -359,6 +361,7 @@ func (m *Model) startSession(taskType config.TaskType, task config.Task, isShort
 	m.elapsed = 0
 	m.duration = m.currentTask.Duration
 	m.timer = timer.New(m.currentTask.Duration)
+	m.sessionStartedAt = time.Now()
 
 	m.sessionState = Running
 	return tea.Batch(
@@ -388,7 +391,8 @@ func (m *Model) recordSession() {
 	}
 
 	if err := m.repo.CreateSession(
-		time.Now().Add(-m.elapsed),
+		m.sessionStartedAt,
+		time.Now(),
 		m.elapsed,
 		db.GetSessionType(m.currentTaskType),
 	); err != nil {
