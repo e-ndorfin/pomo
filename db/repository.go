@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -40,6 +41,53 @@ func (r *SessionRepo) CreateSession(startedAt time.Time, endedAt time.Time, dura
 	}
 
 	return nil
+}
+
+// GetMostRecentSession retrieves the most recently inserted session record.
+func (r *SessionRepo) GetMostRecentSession() (*Session, error) {
+	var row struct {
+		ID        int            `db:"id"`
+		Type      string         `db:"type"`
+		Duration  time.Duration  `db:"duration"`
+		StartedAt string         `db:"started_at"`
+		EndedAt   sql.NullString `db:"ended_at"`
+	}
+
+	if err := r.db.Get(&row, `
+		SELECT id, type, duration, started_at, ended_at
+		FROM sessions
+		ORDER BY id DESC
+		LIMIT 1;
+	`); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	startedAt, err := time.Parse(time.RFC3339, row.StartedAt)
+	if err != nil {
+		return nil, fmt.Errorf("parse session start time: %w", err)
+	}
+
+	var endedAt time.Time
+	if row.EndedAt.Valid && row.EndedAt.String != "" {
+		endedAt, err = time.Parse(time.RFC3339, row.EndedAt.String)
+		if err != nil {
+			return nil, fmt.Errorf("parse session end time: %w", err)
+		}
+	} else {
+		endedAt = startedAt
+		startedAt = endedAt.Add(-row.Duration)
+	}
+
+	return &Session{
+		ID:        row.ID,
+		Type:      row.Type,
+		Duration:  row.Duration,
+		StartedAt: startedAt,
+		EndedAt:   &endedAt,
+	}, nil
 }
 
 // DeleteMostRecentSession deletes the most recently inserted session record.

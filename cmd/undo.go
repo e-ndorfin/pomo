@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Bahaaio/pomo/db"
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ func init() {
 }
 
 type sessionDeleter interface {
+	GetMostRecentSession() (*db.Session, error)
 	DeleteMostRecentSession() (bool, error)
 }
 
@@ -39,7 +41,17 @@ func runUndo(input io.Reader, output io.Writer) {
 }
 
 func runUndoWithRepo(repo sessionDeleter, input io.Reader, output io.Writer) {
-	fmt.Fprint(output, "Delete the most recent session? Type y and press enter to confirm: ")
+	session, err := repo.GetMostRecentSession()
+	if err != nil {
+		die(fmt.Errorf("failed to find most recent session: %w", err))
+	}
+
+	if session == nil {
+		fmt.Fprintln(output, "No sessions to undo.")
+		return
+	}
+
+	printSessionUndoConfirmation(output, session)
 
 	reader := bufio.NewReader(input)
 	answer, err := reader.ReadString('\n')
@@ -63,4 +75,22 @@ func runUndoWithRepo(repo sessionDeleter, input io.Reader, output io.Writer) {
 	}
 
 	fmt.Fprintln(output, "Deleted the most recent session.")
+}
+
+func printSessionUndoConfirmation(output io.Writer, session *db.Session) {
+	endedAt := session.StartedAt.Add(session.Duration)
+	if session.EndedAt != nil {
+		endedAt = *session.EndedAt
+	}
+
+	startedAt := session.StartedAt.Local()
+	endedAt = endedAt.Local()
+
+	fmt.Fprintln(output, "Most recent session:")
+	fmt.Fprintf(output, "  Date: %s\n", startedAt.Format(time.DateOnly))
+	fmt.Fprintf(output, "  Start time: %s\n", startedAt.Format("15:04"))
+	fmt.Fprintf(output, "  End time: %s\n", endedAt.Format("15:04"))
+	fmt.Fprintf(output, "  Duration: %s\n", formatDuration(session.Duration))
+	fmt.Fprintf(output, "  Type: %s\n", session.Type)
+	fmt.Fprint(output, "Delete this session? Type y to confirm or n to cancel, then press enter: ")
 }
