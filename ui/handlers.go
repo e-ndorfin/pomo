@@ -22,6 +22,18 @@ type (
 	commandsDoneMsg struct{}
 )
 
+func (m *Model) closeRepo() {
+	if m.repo == nil {
+		return
+	}
+
+	if err := m.repo.Close(); err != nil {
+		log.Printf("failed to close database connection: %v", err)
+	}
+
+	m.repo = nil
+}
+
 func (m *Model) handleHomeKeys(msg tea.Msg) tea.Cmd {
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
@@ -36,7 +48,7 @@ func (m *Model) handleHomeKeys(msg tea.Msg) tea.Cmd {
 	case "s":
 		return m.enterStats()
 	case "q", "ctrl+c":
-		return tea.Quit
+		return m.Quit()
 	}
 
 	return nil
@@ -406,6 +418,7 @@ func (m *Model) handleCommandsDone() tea.Cmd {
 		m.goHome()
 		return nil
 	}
+	m.closeRepo()
 	m.sessionState = Quitting
 	return tea.Quit
 }
@@ -443,6 +456,7 @@ func (m *Model) Quit() tea.Cmd {
 			m.commandsCancel()
 		}
 
+		m.closeRepo()
 		m.sessionState = Quitting
 		return tea.Quit
 	}
@@ -452,6 +466,7 @@ func (m *Model) Quit() tea.Cmd {
 		return m.waitForCommands()
 	}
 
+	m.closeRepo()
 	m.sessionState = Quitting
 	return tea.Quit
 }

@@ -36,13 +36,13 @@ type Model struct {
 	err error
 
 	// stats
-	allTimeStats db.AllTimeStats
-	dailyStats   db.PeriodStats
+	allTimeStats        db.AllTimeStats
+	dailyStats          db.PeriodStats
 	weeklyDurationStats db.PeriodStats
-	weeklyStats  []db.DailyStat
-	hourlyStats  []db.HourlyStat
-	monthlyStats []db.DailyStat
-	streakStats  db.StreakStats
+	weeklyStats         []db.DailyStat
+	hourlyStats         []db.HourlyStat
+	monthlyStats        []db.DailyStat
+	streakStats         db.StreakStats
 
 	// state
 	width, height int
@@ -85,6 +85,7 @@ func fetchStats() tea.Msg {
 	if err != nil {
 		return errMsg{err: errors.New("failed to connect to the database")}
 	}
+	defer database.Close()
 
 	repo := db.NewSessionRepo(database)
 
