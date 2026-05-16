@@ -80,6 +80,78 @@ func TestSessionRepoStatsHandleLegacyAndNewRows(t *testing.T) {
 	assert.Equal(t, 2, streakStats.Best)
 }
 
+func TestDeleteMostRecentSession(t *testing.T) {
+	repo := newTestRepo(t)
+
+	now := time.Now()
+	insertNewSession(t, repo.db, now.Add(-3*time.Hour), now.Add(-2*time.Hour), time.Hour, WorkSession)
+	insertNewSession(t, repo.db, now.Add(-2*time.Hour), now.Add(-90*time.Minute), 30*time.Minute, BreakSession)
+	insertNewSession(t, repo.db, now.Add(-1*time.Hour), now.Add(-30*time.Minute), 30*time.Minute, WorkSession)
+
+	deleted, err := repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.True(t, deleted)
+	assert.Equal(t, []int{1, 2}, sessionIDs(t, repo.db))
+
+	deleted, err = repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.True(t, deleted)
+	assert.Equal(t, []int{1}, sessionIDs(t, repo.db))
+
+	deleted, err = repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.True(t, deleted)
+	assert.Empty(t, sessionIDs(t, repo.db))
+
+	deleted, err = repo.DeleteMostRecentSession()
+	require.NoError(t, err)
+	assert.False(t, deleted)
+}
+
+func TestGetMostRecentSession(t *testing.T) {
+	repo := newTestRepo(t)
+
+	now := time.Date(2026, 5, 3, 14, 0, 0, 0, time.Local)
+	insertNewSession(t, repo.db, now.Add(-2*time.Hour), now.Add(-90*time.Minute), 30*time.Minute, WorkSession)
+	insertNewSession(t, repo.db, now.Add(-1*time.Hour), now.Add(-45*time.Minute), 15*time.Minute, BreakSession)
+
+	session, err := repo.GetMostRecentSession()
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	require.NotNil(t, session.EndedAt)
+
+	assert.Equal(t, 2, session.ID)
+	assert.Equal(t, string(BreakSession), session.Type)
+	assert.Equal(t, 15*time.Minute, session.Duration)
+	assert.True(t, now.Add(-1*time.Hour).Equal(session.StartedAt))
+	assert.True(t, now.Add(-45*time.Minute).Equal(*session.EndedAt))
+}
+
+func TestGetMostRecentSessionHandlesNoSessions(t *testing.T) {
+	repo := newTestRepo(t)
+
+	session, err := repo.GetMostRecentSession()
+	require.NoError(t, err)
+	assert.Nil(t, session)
+}
+
+func TestGetMostRecentSessionHandlesLegacySession(t *testing.T) {
+	repo := newTestRepo(t)
+
+	endedAt := time.Date(2026, 5, 3, 14, 0, 0, 0, time.Local)
+	insertLegacySession(t, repo.db, endedAt.Add(-25*time.Minute), endedAt, 25*time.Minute, WorkSession)
+
+	session, err := repo.GetMostRecentSession()
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	require.NotNil(t, session.EndedAt)
+
+	assert.Equal(t, string(WorkSession), session.Type)
+	assert.Equal(t, 25*time.Minute, session.Duration)
+	assert.True(t, endedAt.Add(-25*time.Minute).Equal(session.StartedAt))
+	assert.True(t, endedAt.Equal(*session.EndedAt))
+}
+
 func newTestRepo(t *testing.T) *SessionRepo {
 	t.Helper()
 
@@ -93,6 +165,14 @@ func newTestRepo(t *testing.T) *SessionRepo {
 	require.NoError(t, createSchema(database))
 
 	return NewSessionRepo(database)
+}
+
+func sessionIDs(t *testing.T, database *sqlx.DB) []int {
+	t.Helper()
+
+	var ids []int
+	require.NoError(t, database.Select(&ids, "SELECT id FROM sessions ORDER BY id"))
+	return ids
 }
 
 func insertLegacySession(t *testing.T, database *sqlx.DB, actualStart time.Time, recordedEnd time.Time, duration time.Duration, sessionType SessionType) {
